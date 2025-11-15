@@ -15,9 +15,30 @@ class FirebaseSync {
       await window.firebaseConfig.initFirebase();
       this.firebaseREST = window.firebaseConfig.getFirebaseREST();
       
-      // Always try to authenticate
-      await this.authenticate();
+      // First ensure anonymous authentication works
+      const firebaseAuth = await this.authenticateAnonymously();
+      if (!firebaseAuth) {
+        console.error('❌ Failed initial Firebase authentication');
+        return;
+      }
       
+      // Then check if user is logged in with simple auth
+      if (window.simpleAuth && window.simpleAuth.isAuthenticated()) {
+        const email = window.simpleAuth.getUserEmail();
+        console.log('🔄 Simple auth detected, switching to email-based sync:', email);
+        
+        // Update user context but keep Firebase auth
+        this.currentUser = { 
+          uid: `email:${window.simpleAuth.getUserId()}`, 
+          email: email,
+          name: email.split('@')[0]
+        };
+        
+        // Download email-based data
+        await this.downloadFromFirebase();
+      }
+      
+      this.setupPolling();
       this.updateSyncStatus();
       
     } catch (error) {
@@ -25,22 +46,61 @@ class FirebaseSync {
     }
   }
 
-  // Authenticate with Firebase
-  async authenticate() {
+  // Called when user login state changes (from simple auth)
+  async onUserChanged(user) {
+    console.log('🔄 Firebase sync: User changed', user?.email || 'anonymous');
+    
+    if (user && user.email) {
+      // Ensure Firebase is authenticated first
+      const firebaseAuth = await this.authenticateAnonymously();
+      if (!firebaseAuth) {
+        console.error('❌ Failed to authenticate with Firebase');
+        return;
+      }
+      
+      // Switch to email-based user mode
+      this.currentUser = { 
+        uid: `email:${user.id}`, 
+        email: user.email,
+        name: user.name 
+      };
+      
+      console.log('✅ Switched to email-based authentication:', user.email);
+      
+      // Download user's data from their email-based path
+      await this.downloadFromFirebase();
+      this.setupPolling();
+      
+    } else {
+      // Fall back to anonymous mode
+      await this.authenticateAnonymously();
+    }
+    
+    this.updateSyncStatus();
+  }
+
+  // Authenticate with Firebase anonymously
+  async authenticateAnonymously() {
     try {
+      console.log('🔐 Authenticating anonymously...');
       const success = await this.firebaseREST.signInAnonymously();
       if (success) {
         this.isAuthenticated = true;
         this.currentUser = { uid: this.firebaseREST.userId };
         this.setupPolling();
-        console.log('Authentication successful');
+        console.log('✅ Anonymous authentication successful');
         return true;
       }
       return false;
     } catch (error) {
-      console.error('Error authenticating:', error);
+      console.error('Error authenticating anonymously:', error);
       return false;
     }
+  }
+
+  // Legacy method for backward compatibility
+  async authenticate() {
+    return await this.authenticateAnonymously();
   }
 
   // Sign out
@@ -85,9 +145,13 @@ class FirebaseSync {
 
   // Upload local words to Firebase
   async uploadToFirebase() {
-    if (!this.isAuthenticated || !this.syncEnabled) return;
+    if (!this.isAuthenticated) {
+      console.log('⚠️ Upload skipped: not authenticated');
+      return;
+    }
     
     try {
+      console.log('📤 Uploading to path:', this.getDataPath());
       const { words = [] } = await chrome.storage.local.get('words');
       const deviceId = await this.getDeviceId();
       
@@ -97,7 +161,7 @@ class FirebaseSync {
         deviceId: deviceId
       };
       
-      const success = await this.firebaseREST.setData(`users/${this.currentUser.uid}/words`, data);
+      const success = await this.firebaseREST.setData(this.getDataPath(), data);
       
       if (success) {
         this.lastSyncTime = Date.now();
@@ -117,10 +181,14 @@ class FirebaseSync {
 
   // Download words from Firebase
   async downloadFromFirebase() {
-    if (!this.isAuthenticated || !this.syncEnabled) return;
+    if (!this.isAuthenticated) {
+      console.log('⚠️ Download skipped: not authenticated');
+      return;
+    }
     
     try {
-      const data = await this.firebaseREST.getData(`users/${this.currentUser.uid}/words`);
+      console.log('📥 Downloading from path:', this.getDataPath());
+      const data = await this.firebaseREST.getData(this.getDataPath());
       
       if (data && data.words) {
         const { words: localWords = [] } = await chrome.storage.local.get('words');
@@ -142,6 +210,8 @@ class FirebaseSync {
         }
         
         return mergedWords;
+      } else {
+        console.log('📥 No data found in Firebase for this user');
       }
     } catch (error) {
       console.error('Error downloading from Firebase:', error);
@@ -158,7 +228,7 @@ class FirebaseSync {
     
     // Poll every 10 seconds for changes
     this.pollingInterval = this.firebaseREST.startPolling(
-      `users/${this.currentUser.uid}/words`, 
+      this.getDataPath(), 
       async (data) => {
         if (data && data.words && data.deviceId !== await this.getDeviceId()) {
           // Data changed from another device
@@ -190,6 +260,18 @@ class FirebaseSync {
     if (this.pollingInterval) {
       this.firebaseREST.stopPolling(this.pollingInterval);
       this.pollingInterval = null;
+    }
+  }
+
+  // Get Firebase data path based on authentication mode
+  getDataPath() {
+    if (this.currentUser && this.currentUser.email) {
+      // Use email-based path for simple auth users
+      const emailHash = btoa(this.currentUser.email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+      return `users/email-${emailHash}/words`;
+    } else {
+      // Use anonymous user ID for anonymous users
+      return `users/${this.currentUser.uid}/words`;
     }
   }
 

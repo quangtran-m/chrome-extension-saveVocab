@@ -132,7 +132,9 @@ dropdownMenu.style.cssText = `
 
 // Menu items
 const menuItems = [
-  { id: 'uploadButton', text: '⬆️ Upload to Firebase', color: '#4CAF50' },
+  { id: 'simpleLoginButton', text: '🔐 Đăng nhập Email', color: '#4CAF50', authState: 'logged-out' },
+  { id: 'simpleLogoutButton', text: '👤 User', color: '#34A853', authState: 'logged-in' },
+  { id: 'uploadButton', text: '⬆️ Upload to Firebase', color: '#2196F3' },
   { id: 'downloadButton', text: '⬇️ Download from Firebase', color: '#2196F3' },
   { id: 'exportButton', text: '📄 Export file', color: '#FF9800' },
   { id: 'importButton', text: '📁 Import file', color: '#9C27B0' }
@@ -155,6 +157,13 @@ menuItems.forEach((item, index) => {
     text-align: left;
     transition: opacity 0.2s;
   `;
+  
+  // Set initial visibility based on auth state
+  if (item.authState === 'logged-out') {
+    menuItem.style.display = 'block'; // Initially show login button
+  } else if (item.authState === 'logged-in') {
+    menuItem.style.display = 'none'; // Initially hide logout button
+  }
   
   // Hover effects
   menuItem.addEventListener('mouseenter', () => {
@@ -572,6 +581,39 @@ setTimeout(() => {
   } else {
     console.warn("⚠️ Download button not found");
   }
+
+  // Simple Login button event handler
+  const simpleLoginButton = document.getElementById('simpleLoginButton');
+  if (simpleLoginButton) {
+    simpleLoginButton.onclick = async () => {
+      try {
+        if (window.simpleAuth) {
+          await window.simpleAuth.showLoginPrompt();
+        }
+      } catch (error) {
+        console.error('❌ Simple login failed:', error);
+      }
+    };
+    console.log("✅ Simple Login button handler attached");
+  } else {
+    console.warn("⚠️ Simple Login button not found");
+  }
+
+  // Simple Logout/Change Email button event handler
+  const simpleLogoutButton = document.getElementById('simpleLogoutButton');
+  if (simpleLogoutButton) {
+    simpleLogoutButton.onclick = async () => {
+      if (!window.simpleAuth) return;
+      
+      // Show action menu
+      const actions = await window.simpleAuth.showUserMenu();
+      // User menu will handle the actions
+    };
+    console.log("✅ Simple Logout button handler attached");
+  } else {
+    console.warn("⚠️ Simple Logout button not found");
+  }
+  
 }, 500); // Wait 500ms for buttons to be created
 
 // Show sync status and enable auto-sync
