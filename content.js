@@ -287,74 +287,38 @@ highlightAll();
 // ========== Triple H Click Detection ========== //
 let hClickCount = 0;
 let hClickTimer = null;
-let removeButton = null;
+// Selected word tracking for deletion
+let selectedWordElement = null;
+let selectedWordText = null;
 
-function createRemoveButton() {
-  const button = document.createElement("button");
-  button.textContent = "🗑️ Remove";
-  button.style.cssText = `
-    position: fixed;
-    background: #f44336;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 6px 12px;
-    font-size: 12px;
-    cursor: pointer;
-    z-index: 1000000;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    font-family: sans-serif;
-    white-space: nowrap;
-  `;
-  button.addEventListener('mouseenter', () => {
-    button.style.background = '#da190b';
-  });
-  button.addEventListener('mouseleave', () => {
-    button.style.background = '#f44336';
-  });
-  return button;
-}
-
-function showRemoveButton(x, y, highlightedText, highlightElement) {
-  hideRemoveButton();
+function selectWordForDeletion(highlightElement, highlightedText) {
+  // Clear previous selection
+  clearSelectedWord();
   
-  removeButton = createRemoveButton();
-  removeButton.style.left = Math.max(10, Math.min(x, window.innerWidth - 120)) + 'px';
-  removeButton.style.top = Math.max(10, y - 45) + 'px';
+  // Set new selection
+  selectedWordElement = highlightElement;
+  selectedWordText = highlightedText;
   
-  removeButton.onclick = async () => {
-    const { words = [], deletedWords = [] } = await chrome.storage.local.get(["words", "deletedWords"]);
-    const newList = words.filter(w => w !== highlightedText);
-    const newDeletedList = [...deletedWords, highlightedText];
-    
-    await chrome.storage.local.set({ 
-      words: newList, 
-      deletedWords: newDeletedList 
-    });
-    
-    removeHighlight(highlightedText);
-    hideRemoveButton();
-    
-    console.log('🗑️ Word deleted and marked for sync:', highlightedText);
-    
-    // Always auto-sync to Firebase
-    if (window.firebaseSync) {
-      await window.firebaseSync.uploadToFirebase();
-    }
-  };
+  // Add visual indicator
+  highlightElement.style.outline = '2px solid #ff4444';
+  highlightElement.style.outlineOffset = '2px';
   
-  document.body.appendChild(removeButton);
+  console.log('🎯 Word selected for deletion (use Ctrl+Backspace):', highlightedText);
   
-  // Auto hide after 3 seconds
+  // Auto-clear selection after 10 seconds
   setTimeout(() => {
-    hideRemoveButton();
-  }, 3000);
+    if (selectedWordElement === highlightElement) {
+      clearSelectedWord();
+    }
+  }, 10000);
 }
 
-function hideRemoveButton() {
-  if (removeButton) {
-    removeButton.remove();
-    removeButton = null;
+function clearSelectedWord() {
+  if (selectedWordElement) {
+    selectedWordElement.style.outline = '';
+    selectedWordElement.style.outlineOffset = '';
+    selectedWordElement = null;
+    selectedWordText = null;
   }
 }
 
@@ -417,6 +381,25 @@ document.addEventListener("keydown", async (e) => {
   }
 
   if (e.ctrlKey && e.key === "Backspace") {
+    // Check if we have a selected word (with red outline)
+    if (selectedWordText && selectedWordElement) {
+      const { words = [] } = await chrome.storage.local.get("words");
+      const newList = words.filter(w => w !== selectedWordText);
+      await chrome.storage.local.set({ words: newList });
+      removeHighlight(selectedWordText);
+      
+      // Always auto-sync to Firebase
+      if (window.firebaseSync) {
+        await window.firebaseSync.uploadToFirebase();
+      }
+      
+      // Clear selection after deletion
+      clearSelectedWord();
+      console.log('🗑️ Word deleted via Ctrl+Backspace:', selectedWordText);
+      return;
+    }
+    
+    // Fallback to selected text if no word is selected
     const selection = window.getSelection().toString().trim();
     if (!selection) return;
     const { words = [] } = await chrome.storage.local.get("words");
@@ -433,9 +416,9 @@ document.addEventListener("keydown", async (e) => {
 
 // ========== Click on Highlighted Text ========== //
 document.addEventListener('click', async (e) => {
-  // Hide remove button if clicking outside
-  if (e.target !== removeButton && !removeButton?.contains(e.target)) {
-    hideRemoveButton();
+  // Clear selected word if clicking outside highlighted text
+  if (!e.target.classList.contains('jp-highlight')) {
+    clearSelectedWord();
   }
   
   if (e.target.classList.contains('jp-highlight')) {
@@ -464,11 +447,8 @@ document.addEventListener('click', async (e) => {
       document.body.removeChild(textArea);
     }
     
-    // Show remove button at mouse cursor position
-    const x = e.clientX - 60; // Center button horizontally around cursor
-    const y = e.clientY + window.scrollY - 50; // Position above cursor
-    
-    showRemoveButton(x, y, highlightedText, e.target);
+    // Select word for deletion with red outline
+    selectWordForDeletion(e.target, highlightedText);
   }
 });
 
@@ -733,6 +713,7 @@ setTimeout(() => {
   
   notification.innerHTML = `
     <strong>✅ JP Vocab Extension Loaded</strong><br>
+    <small>Click từ highlighted để xóa • Popup tự động theo scroll</small><br>
     <small>Debug: checkToolbar() | forceShowToolbar()</small>
   `;
   
