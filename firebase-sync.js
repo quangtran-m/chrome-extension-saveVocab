@@ -3,7 +3,7 @@ class FirebaseSync {
   constructor() {
     this.isAuthenticated = false;
     this.currentUser = null;
-    this.syncEnabled = true; // Always enabled
+    this.syncEnabled = true; // Will be loaded from storage
     this.lastSyncTime = null;
     this.pollingInterval = null;
     this.firebaseREST = null;
@@ -12,6 +12,11 @@ class FirebaseSync {
 
   async init() {
     try {
+      // Load sync enabled setting  
+      const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+      this.syncEnabled = syncEnabled;
+      console.log('🔄 Sync setting loaded:', this.syncEnabled);
+      
       await window.firebaseConfig.initFirebase();
       this.firebaseREST = window.firebaseConfig.getFirebaseREST();
       
@@ -467,6 +472,24 @@ class FirebaseSync {
     this.showSyncStatus('🔄 Đang đồng bộ...', 'info');
     await this.uploadToFirebase();
     await this.downloadFromFirebase();
+  }
+
+  // Set auto sync enabled/disabled
+  async setAutoSync(enabled) {
+    this.syncEnabled = enabled;
+    
+    // Save to storage
+    await chrome.storage.local.set({ syncEnabled: enabled });
+    
+    console.log(`🔄 Auto Sync ${enabled ? 'ENABLED' : 'DISABLED'}`);
+    
+    if (enabled) {
+      // Restart polling if auto sync is enabled
+      this.setupPolling();
+    } else {
+      // Stop polling if auto sync is disabled
+      this.cleanup();
+    }
   }
 }
 

@@ -134,6 +134,7 @@ dropdownMenu.style.cssText = `
 const menuItems = [
   { id: 'simpleLoginButton', text: '🔐 Đăng nhập Email', color: '#4CAF50', authState: 'logged-out' },
   { id: 'simpleLogoutButton', text: '👤 User', color: '#34A853', authState: 'logged-in' },
+  { id: 'autoSyncToggle', text: '🔄 Auto Sync: ON', color: '#00C851', toggle: true },
   { id: 'uploadButton', text: '⬆️ Upload to Firebase', color: '#2196F3' },
   { id: 'downloadButton', text: '⬇️ Download from Firebase', color: '#2196F3' },
   { id: 'exportButton', text: '📄 Export file', color: '#FF9800' },
@@ -175,6 +176,19 @@ menuItems.forEach((item, index) => {
   
   dropdownMenu.appendChild(menuItem);
 });
+
+// Load and update auto sync button state
+async function updateAutoSyncButton() {
+  const autoSyncToggle = document.getElementById('autoSyncToggle');
+  if (autoSyncToggle) {
+    const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+    autoSyncToggle.textContent = syncEnabled ? '🔄 Auto Sync: ON' : '⏸️ Auto Sync: OFF';
+    autoSyncToggle.style.background = syncEnabled ? '#00C851' : '#FF6B6B';
+  }
+}
+
+// Initialize auto sync button state
+updateAutoSyncButton();
 
 // Assemble toolbar
 toolbar.appendChild(syncStatusBtn);
@@ -342,9 +356,12 @@ document.addEventListener("keydown", async (e) => {
           await chrome.storage.local.set({ words });
           highlightAll();
           
-          // Always auto-sync to Firebase
+          // Auto-sync to Firebase if enabled
           if (window.firebaseSync) {
-            await window.firebaseSync.uploadToFirebase();
+            const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+            if (syncEnabled) {
+              await window.firebaseSync.uploadToFirebase();
+            }
           }
         }
         window.getSelection().removeAllRanges();
@@ -373,9 +390,12 @@ document.addEventListener("keydown", async (e) => {
       await chrome.storage.local.set({ words });
       highlightAll();
       
-      // Always auto-sync to Firebase
+      // Auto-sync to Firebase if enabled
       if (window.firebaseSync) {
-        await window.firebaseSync.uploadToFirebase();
+        const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+        if (syncEnabled) {
+          await window.firebaseSync.uploadToFirebase();
+        }
       }
     }
   }
@@ -388,9 +408,12 @@ document.addEventListener("keydown", async (e) => {
       await chrome.storage.local.set({ words: newList });
       removeHighlight(selectedWordText);
       
-      // Always auto-sync to Firebase
+      // Auto-sync to Firebase if enabled
       if (window.firebaseSync) {
-        await window.firebaseSync.uploadToFirebase();
+        const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+        if (syncEnabled) {
+          await window.firebaseSync.uploadToFirebase();
+        }
       }
       
       // Clear selection after deletion
@@ -407,9 +430,12 @@ document.addEventListener("keydown", async (e) => {
     await chrome.storage.local.set({ words: newList });
     removeHighlight(selection);
     
-    // Always auto-sync to Firebase
+    // Auto-sync to Firebase if enabled
     if (window.firebaseSync) {
-      await window.firebaseSync.uploadToFirebase();
+      const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+      if (syncEnabled) {
+        await window.firebaseSync.uploadToFirebase();
+      }
     }
   }
 });
@@ -513,9 +539,12 @@ setTimeout(() => {
         await chrome.storage.local.set({ words: merged });
         highlightAll();
         
-        // Auto-sync to Firebase
+        // Auto-sync to Firebase if enabled
         if (window.firebaseSync) {
-          await window.firebaseSync.uploadToFirebase();
+          const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+          if (syncEnabled) {
+            await window.firebaseSync.uploadToFirebase();
+          }
         }
         
         importButton.disabled = false;
@@ -600,6 +629,31 @@ setTimeout(() => {
     console.log("✅ Simple Logout button handler attached");
   } else {
     console.warn("⚠️ Simple Logout button not found");
+  }
+
+  // Auto Sync Toggle button event handler
+  const autoSyncToggle = document.getElementById('autoSyncToggle');
+  if (autoSyncToggle) {
+    autoSyncToggle.onclick = async () => {
+      const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+      const newSyncEnabled = !syncEnabled;
+      
+      // Save new state and update Firebase sync
+      if (window.firebaseSync) {
+        await window.firebaseSync.setAutoSync(newSyncEnabled);
+      } else {
+        await chrome.storage.local.set({ syncEnabled: newSyncEnabled });
+      }
+      
+      // Update button appearance
+      autoSyncToggle.textContent = newSyncEnabled ? '🔄 Auto Sync: ON' : '⏸️ Auto Sync: OFF';
+      autoSyncToggle.style.background = newSyncEnabled ? '#00C851' : '#FF6B6B';
+      
+      console.log(`🔄 Auto Sync ${newSyncEnabled ? 'ENABLED' : 'DISABLED'}`);
+    };
+    console.log("✅ Auto Sync Toggle button handler attached");
+  } else {
+    console.warn("⚠️ Auto Sync Toggle button not found");
   }
   
 }, 500); // Wait 500ms for buttons to be created
@@ -766,8 +820,11 @@ window.clearDeletedWords = async function() {
   console.log("🗑️ Deleted words list cleared");
   
   if (window.firebaseSync) {
-    await window.firebaseSync.uploadToFirebase();
-    console.log("📤 Changes uploaded to Firebase");
+    const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+    if (syncEnabled) {
+      await window.firebaseSync.uploadToFirebase();
+      console.log("📤 Changes uploaded to Firebase");
+    }
   }
 };
 
