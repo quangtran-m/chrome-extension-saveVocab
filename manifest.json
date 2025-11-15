@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "JP Vocab Highlighter",
+  "version": "1.4",
+  "description": "Highlight và lưu từ vựng tiếng Nhật khi bôi đen với đồng bộ Firebase.",
+  "permissions": ["storage", "activeTab", "scripting", "downloads"],
+  "host_permissions": [
+    "https://*.googleapis.com/*",
+    "https://*.firebaseio.com/*",
+    "https://*.firebaseapp.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["env-loader.js", "firebase-config.js", "firebase-sync.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [".env"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

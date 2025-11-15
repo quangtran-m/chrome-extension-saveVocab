@@ -1,0 +1,22 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        "words": {
+          ".validate": "newData.hasChildren(['words', 'lastUpdated', 'deviceId'])",
+          "words": {
+            ".validate": "newData.isString() || (newData.hasChildren() && newData.val().every(function(word) { return word.length <= 100; }))"
+          },
+          "lastUpdated": {
+            ".validate": "newData.isNumber()"
+          },
+          "deviceId": {
+            ".validate": "newData.isString() && newData.val().length <= 50"
+          }
+        }
+      }
+    }
+  }
+}
