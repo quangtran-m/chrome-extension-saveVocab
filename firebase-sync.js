@@ -1,9 +1,9 @@
-// Firebase Sync Manager (REST API Version)
+// Firebase Sync Manager (REST API Version) - Always Enabled
 class FirebaseSync {
   constructor() {
     this.isAuthenticated = false;
     this.currentUser = null;
-    this.syncEnabled = false;
+    this.syncEnabled = true; // Always enabled
     this.lastSyncTime = null;
     this.pollingInterval = null;
     this.firebaseREST = null;
@@ -15,13 +15,8 @@ class FirebaseSync {
       await window.firebaseConfig.initFirebase();
       this.firebaseREST = window.firebaseConfig.getFirebaseREST();
       
-      // Check for stored sync preference
-      const { syncEnabled = false } = await chrome.storage.local.get('syncEnabled');
-      this.syncEnabled = syncEnabled;
-      
-      if (this.syncEnabled) {
-        await this.authenticate();
-      }
+      // Always try to authenticate
+      await this.authenticate();
       
       this.updateSyncStatus();
       
@@ -210,16 +205,100 @@ class FirebaseSync {
 
   // Update sync status in UI
   updateSyncStatus() {
-    const syncButton = document.getElementById('syncButton');
-    if (syncButton) {
-      if (this.isAuthenticated && this.syncEnabled) {
-        syncButton.textContent = '☁️ Sync On';
-        syncButton.style.background = '#4CAF50';
-      } else {
-        syncButton.textContent = '☁️ Sync Off';
-        syncButton.style.background = '#757575';
-      }
+    console.log("🔄 Updating sync status...");
+    
+    const uploadButton = document.getElementById('uploadButton');
+    const downloadButton = document.getElementById('downloadButton');
+    const syncStatusButton = document.getElementById('syncStatusButton');
+    const toolbar = document.getElementById('jp-vocab-toolbar');
+    
+    // Debug toolbar visibility
+    console.log("🔍 UI Elements check:", {
+      toolbar: !!toolbar,
+      toolbarVisible: toolbar ? toolbar.offsetParent !== null : false,
+      uploadButton: !!uploadButton,
+      downloadButton: !!downloadButton,
+      syncStatusButton: !!syncStatusButton,
+      isAuthenticated: this.isAuthenticated
+    });
+    
+    // Ensure toolbar is visible
+    if (toolbar && toolbar.offsetParent === null) {
+      console.warn("⚠️ Toolbar is hidden, forcing visibility...");
+      toolbar.style.display = 'flex';
+      toolbar.style.visibility = 'visible';
     }
+    
+    if (this.isAuthenticated) {
+      // Enable menu items
+      if (uploadButton) {
+        uploadButton.style.opacity = '1';
+        uploadButton.disabled = false;
+      }
+      if (downloadButton) {
+        downloadButton.style.opacity = '1';
+        downloadButton.disabled = false;
+      }
+      
+      // Update main status button
+      if (syncStatusButton) {
+        syncStatusButton.textContent = '🔄 Connected';
+        syncStatusButton.style.background = '#4CAF50';
+        syncStatusButton.title = 'Firebase connected - Click for sync info';
+      }
+      
+      console.log("✅ UI updated for authenticated state");
+    } else {
+      // Disable menu items
+      if (uploadButton) {
+        uploadButton.style.opacity = '0.5';
+        uploadButton.disabled = true;
+      }
+      if (downloadButton) {
+        downloadButton.style.opacity = '0.5';
+        downloadButton.disabled = true;
+      }
+      
+      // Update main status button
+      if (syncStatusButton) {
+        syncStatusButton.textContent = '🔄 Offline';
+        syncStatusButton.style.background = '#757575';
+        syncStatusButton.title = 'Firebase disconnected - Check your connection';
+      }
+      
+      console.log("⚠️ UI updated for offline state");
+    }
+  }
+
+  // Show detailed sync information
+  async showSyncInfo() {
+    const { words = [] } = await chrome.storage.local.get('words');
+    const { lastSyncTime } = await chrome.storage.local.get('lastSyncTime');
+    const deviceId = await this.getDeviceId();
+    
+    const lastSyncText = lastSyncTime 
+      ? new Date(lastSyncTime).toLocaleString()
+      : 'Chưa đồng bộ';
+    
+    const statusMessage = `
+📊 Thông tin đồng bộ:
+• Trạng thái: ${this.isAuthenticated ? '🟢 Kết nối' : '🔴 Offline'}
+• Từ vựng local: ${words.length} từ
+• Lần sync cuối: ${lastSyncText}
+• Device ID: ${deviceId.substring(0, 12)}...
+• Auto-sync: ${this.syncEnabled ? '✅ Bật' : '❌ Tắt'}
+    `.trim();
+    
+    this.showSyncStatus(statusMessage, 'info');
+    
+    // Also log to console
+    console.log('📊 Sync Info:', {
+      authenticated: this.isAuthenticated,
+      wordsCount: words.length,
+      lastSyncTime: lastSyncTime,
+      deviceId: deviceId,
+      syncEnabled: this.syncEnabled
+    });
   }
 
   // Show sync status message
@@ -230,42 +309,54 @@ class FirebaseSync {
     
     const statusDiv = document.createElement('div');
     statusDiv.id = 'syncStatus';
-    statusDiv.textContent = message;
+    
+    // Handle multi-line messages
+    if (message.includes('\n')) {
+      statusDiv.innerHTML = message.replace(/\n/g, '<br>');
+    } else {
+      statusDiv.textContent = message;
+    }
+    
     statusDiv.style.cssText = `
       position: fixed;
       top: 20px;
       right: 20px;
-      padding: 8px 16px;
-      border-radius: 4px;
+      padding: 12px 16px;
+      border-radius: 8px;
       color: white;
-      font-family: sans-serif;
+      font-family: monospace;
       font-size: 12px;
       z-index: 1000001;
+      max-width: 350px;
+      white-space: pre-line;
+      line-height: 1.4;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
     `;
     
     document.body.appendChild(statusDiv);
     
-    // Auto remove after 3 seconds
+    // Auto remove after 8 seconds for longer messages
+    const timeout = message.length > 100 ? 8000 : 4000;
     setTimeout(() => {
       if (statusDiv.parentNode) {
         statusDiv.remove();
       }
-    }, 3000);
+    }, timeout);
   }
 
-  // Force sync
+  // Force sync (not needed anymore but keeping for compatibility)
   async forceSync() {
-    if (!this.isAuthenticated || !this.syncEnabled) {
-      this.showSyncStatus('Sync chưa được bật', 'error');
+    if (!this.isAuthenticated) {
+      this.showSyncStatus('🔴 Chưa kết nối Firebase', 'error');
       return;
     }
     
-    this.showSyncStatus('Đang đồng bộ...', 'info');
+    this.showSyncStatus('🔄 Đang đồng bộ...', 'info');
     await this.uploadToFirebase();
     await this.downloadFromFirebase();
   }
 }
 
-// Initialize Firebase Sync
+// Initialize Firebase Sync - Always enabled
 window.firebaseSync = new FirebaseSync();

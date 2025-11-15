@@ -73,17 +73,22 @@ Extension Chrome để highlight và đồng bộ từ vựng tiếng Nhật tr�
 
 ## 🎯 Cách sử dụng Sync
 
-### Bật đồng bộ:
-1. Trên bất kỳ trang web nào, nhìn xuống góc dưới trái
-2. Click nút **"☁️ Sync Off"**  
-3. Click **"Bật đồng bộ"**
-4. Nút sẽ chuyển thành **"☁️ Sync On"** màu xanh
+### Giao diện mới:
+- **🔄 Connected/Offline**: Button chính hiển thị trạng thái kết nối Firebase
+- **⚙️ Menu**: Click để mở menu với 4 tùy chọn:
+  - **⬆️ Upload to Firebase**: Đẩy từ vựng từ local lên Firebase
+  - **⬇️ Download from Firebase**: Tải từ vựng từ Firebase về local
+  - **📄 Export file**: Xuất danh sách từ vựng ra file .txt
+  - **� Import file**: Nhập từ vựng từ file .txt
 
-### Các tính năng sync:
-- **Tự động**: Mỗi khi thêm/xóa từ vựng sẽ tự động sync
-- **Realtime**: Từ vựng từ thiết bị khác sẽ tự động hiển thị
-- **Đồng bộ ngay**: Click "Đồng bộ ngay" để force sync
-- **Tắt sync**: Click "Tắt đồng bộ" để ngưng sync
+### Sync tự động:
+- **Auto-enabled**: Sync luôn được bật tự động
+- **Auto-upload**: Mỗi khi thêm/xóa từ vựng sẽ tự động upload lên Firebase
+- **Auto-polling**: Tự động kiểm tra thay đổi từ thiết bị khác mỗi 10 giây
+
+### Trạng thái sync:
+- **🔄 Connected** (xanh lá): Đã kết nối Firebase, sync hoạt động
+- **🔄 Offline** (xám): Chưa kết nối hoặc lỗi Firebase
 
 ## 🎮 Hotkeys (không đổi)
 
@@ -126,16 +131,18 @@ users/
 - Database rules test mode - chỉ dùng cho development
 - Để production cần setup security rules phù hợp
 
-## 📝 Changelog v1.4
+## 📝 Changelog v1.6
 
-- ✅ Added Firebase sync functionality
-- ✅ Added sync controls in UI
-- ✅ Added realtime sync across devices  
-- ✅ Added sync status notifications
-- ✅ Updated manifest for Firebase permissions
-- ✅ Improved highlight refresh logic
-- ✅ Environment variables support for secure config
-- ✅ Ready for GitHub deployment
+- ✅ **Clean UI**: Gom 4 chức năng vào 1 dropdown menu
+- ✅ **Renamed buttons**: Export/Import → Export file/Import file  
+- ✅ **Status button**: Main button hiển thị trạng thái kết nối
+- ✅ **Compact design**: UI gọn gàng hơn, ít chiếm diện tích
+- ✅ **Better UX**: Menu tự đóng sau khi click, hover effects
+- ✅ **Loading states**: Visual feedback khi đang xử lý
+- ✅ **Stability fixes**: Toolbar watchdog, auto-restore visibility
+- ✅ **Debug system**: Enhanced debugging và troubleshooting
+- ✅ Always-on sync với auto-upload
+- ✅ Environment variables support cho bảo mật
 
 ## 🚀 GitHub Deployment
 
