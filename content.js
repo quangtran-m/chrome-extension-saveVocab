@@ -323,11 +323,19 @@ function showRemoveButton(x, y, highlightedText, highlightElement) {
   removeButton.style.top = Math.max(10, y - 45) + 'px';
   
   removeButton.onclick = async () => {
-    const { words = [] } = await chrome.storage.local.get("words");
+    const { words = [], deletedWords = [] } = await chrome.storage.local.get(["words", "deletedWords"]);
     const newList = words.filter(w => w !== highlightedText);
-    await chrome.storage.local.set({ words: newList });
+    const newDeletedList = [...deletedWords, highlightedText];
+    
+    await chrome.storage.local.set({ 
+      words: newList, 
+      deletedWords: newDeletedList 
+    });
+    
     removeHighlight(highlightedText);
     hideRemoveButton();
+    
+    console.log('🗑️ Word deleted and marked for sync:', highlightedText);
     
     // Always auto-sync to Firebase
     if (window.firebaseSync) {
@@ -633,6 +641,7 @@ console.log("📊 Extension status:", {
 
 // Toolbar watchdog - monitor toolbar visibility
 let toolbarWatchdog = null;
+let lastToolbarRestored = 0;
 
 function startToolbarWatchdog() {
   if (toolbarWatchdog) clearInterval(toolbarWatchdog);
@@ -645,9 +654,17 @@ function startToolbarWatchdog() {
       return;
     }
     
-    const isVisible = toolbar.offsetParent !== null;
-    if (!isVisible) {
-      console.warn("⚠️ Toolbar hidden, restoring...");
+    // Check if toolbar is actually hidden (not just CSS visibility)
+    const computedStyle = window.getComputedStyle(toolbar);
+    const isHidden = computedStyle.display === 'none' || 
+                    computedStyle.visibility === 'hidden' || 
+                    computedStyle.opacity === '0' ||
+                    toolbar.offsetParent === null;
+    
+    // Only restore if truly hidden and not recently restored
+    const now = Date.now();
+    if (isHidden && (now - lastToolbarRestored > 5000)) {
+      console.warn("⚠️ Toolbar actually hidden, restoring...");
       
       // Force restore toolbar visibility
       toolbar.style.cssText = `
@@ -670,13 +687,19 @@ function startToolbarWatchdog() {
         opacity: 1 !important;
       `;
       
+      lastToolbarRestored = now;
       console.log("✅ Toolbar restored");
     }
-  }, 2000); // Check every 2 seconds
+  }, 5000); // Check every 5 seconds (less frequent)
 }
 
-// Start watchdog
-startToolbarWatchdog();
+// Start watchdog (disabled by default - enable with: window.enableToolbarWatchdog = true)
+if (window.enableToolbarWatchdog) {
+  startToolbarWatchdog();
+  console.log("🔍 Toolbar watchdog started");
+} else {
+  console.log("🔍 Toolbar watchdog disabled (enable with: window.enableToolbarWatchdog = true)");
+}
 
 // Global function to check toolbar
 window.checkToolbar = () => {
@@ -721,8 +744,68 @@ setTimeout(() => {
   }, 5000);
 }, 100);
 
+// Debug helper functions
+window.stopWatchdog = function() {
+  if (toolbarWatchdog) {
+    clearInterval(toolbarWatchdog);
+    toolbarWatchdog = null;
+    console.log("🛑 Toolbar watchdog stopped");
+  }
+};
+
+window.startWatchdog = function() {
+  startToolbarWatchdog();
+  console.log("▶️ Toolbar watchdog started");
+};
+
+window.checkToolbarStatus = function() {
+  const toolbar = document.getElementById('jp-vocab-toolbar');
+  if (!toolbar) {
+    console.log("❌ Toolbar element not found");
+    return false;
+  }
+  
+  const computedStyle = window.getComputedStyle(toolbar);
+  const status = {
+    exists: true,
+    display: computedStyle.display,
+    visibility: computedStyle.visibility,
+    opacity: computedStyle.opacity,
+    offsetParent: toolbar.offsetParent !== null,
+    position: computedStyle.position,
+    zIndex: computedStyle.zIndex
+  };
+  
+  console.log("🔍 Toolbar status:", status);
+  return status;
+};
+
+window.clearDeletedWords = async function() {
+  await chrome.storage.local.set({ deletedWords: [] });
+  console.log("🗑️ Deleted words list cleared");
+  
+  if (window.firebaseSync) {
+    await window.firebaseSync.uploadToFirebase();
+    console.log("📤 Changes uploaded to Firebase");
+  }
+};
+
+window.showSyncStatus = async function() {
+  const { words = [], deletedWords = [] } = await chrome.storage.local.get(['words', 'deletedWords']);
+  console.log("📊 Current sync status:");
+  console.log("  Active words:", words.length);
+  console.log("  Deleted words:", deletedWords.length);
+  console.log("  Words:", words);
+  console.log("  Deleted:", deletedWords);
+};
+
 // Update debug commands log
 console.log("🎯 Debug commands available:");
-console.log("  - checkToolbar() : Check toolbar status");
+console.log("  - checkToolbarStatus() : Check detailed toolbar status");
 console.log("  - forceShowToolbar() : Force show toolbar");
+console.log("  - startWatchdog() : Start toolbar watchdog");
+console.log("  - stopWatchdog() : Stop toolbar watchdog");
+console.log("  - showSyncStatus() : Show current words and deleted words");
+console.log("  - clearDeletedWords() : Clear deleted words list and sync");
+console.log("  - window.enableToolbarWatchdog = true : Enable watchdog");
 console.log("  - document.getElementById('jp-vocab-toolbar') : Get toolbar element");

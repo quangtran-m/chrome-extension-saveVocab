@@ -152,11 +152,12 @@ class FirebaseSync {
     
     try {
       console.log('📤 Uploading to path:', this.getDataPath());
-      const { words = [] } = await chrome.storage.local.get('words');
+      const { words = [], deletedWords = [] } = await chrome.storage.local.get(['words', 'deletedWords']);
       const deviceId = await this.getDeviceId();
       
       const data = {
         words: words,
+        deletedWords: deletedWords, // Track deleted words for sync
         lastUpdated: Date.now(),
         deviceId: deviceId
       };
@@ -191,18 +192,33 @@ class FirebaseSync {
       const data = await this.firebaseREST.getData(this.getDataPath());
       
       if (data && data.words) {
-        const { words: localWords = [] } = await chrome.storage.local.get('words');
+        const { words: localWords = [], deletedWords: localDeletedWords = [] } = await chrome.storage.local.get(['words', 'deletedWords']);
+        const remoteWords = data.words || [];
+        const remoteDeletedWords = data.deletedWords || [];
         
-        // Merge with local words (avoid duplicates)
-        const mergedWords = Array.from(new Set([...localWords, ...data.words]));
+        // Merge logic with delete sync
+        console.log('🔄 Merging words...');
+        console.log('Local words:', localWords.length);
+        console.log('Remote words:', remoteWords.length);
+        console.log('Local deleted:', localDeletedWords.length);
+        console.log('Remote deleted:', remoteDeletedWords.length);
         
+        // Start with all local and remote words
+        let mergedWords = [...new Set([...localWords, ...remoteWords])];
+        
+        // Remove words that were deleted locally or remotely
+        const allDeletedWords = [...new Set([...localDeletedWords, ...remoteDeletedWords])];
+        mergedWords = mergedWords.filter(word => !allDeletedWords.includes(word));
+        
+        // Update both words and deleted words lists
         await chrome.storage.local.set({ 
           words: mergedWords,
+          deletedWords: allDeletedWords,
           lastSyncTime: Date.now()
         });
         
-        console.log('Words downloaded from Firebase successfully');
-        this.showSyncStatus('Tải về thành công', 'success');
+        console.log('📥 Sync completed. Final word count:', mergedWords.length);
+        this.showSyncStatus('Đồng bộ thành công', 'success');
         
         // Trigger re-highlight
         if (window.highlightAll) {
@@ -232,17 +248,31 @@ class FirebaseSync {
       async (data) => {
         if (data && data.words && data.deviceId !== await this.getDeviceId()) {
           // Data changed from another device
-          const { words: localWords = [] } = await chrome.storage.local.get('words');
-          const remoteWords = data.words;
+          console.log('🔄 Remote changes detected, merging...');
           
-          // Simple merge strategy - combine both arrays
-          const mergedWords = Array.from(new Set([...localWords, ...remoteWords]));
+          const { words: localWords = [], deletedWords: localDeletedWords = [] } = 
+            await chrome.storage.local.get(['words', 'deletedWords']);
           
+          const remoteWords = data.words || [];
+          const remoteDeletedWords = data.deletedWords || [];
+          
+          // Use same merge logic as downloadFromFirebase
+          let mergedWords = [...new Set([...localWords, ...remoteWords])];
+          const allDeletedWords = [...new Set([...localDeletedWords, ...remoteDeletedWords])];
+          mergedWords = mergedWords.filter(word => !allDeletedWords.includes(word));
+          
+          // Check if there are actual changes
           if (mergedWords.length !== localWords.length || 
-              JSON.stringify(mergedWords.sort()) !== JSON.stringify(localWords.sort())) {
-            await chrome.storage.local.set({ words: mergedWords });
-            console.log('Words synced from another device');
-            this.showSyncStatus('Đã đồng bộ từ thiết bị khác', 'info');
+              JSON.stringify(mergedWords.sort()) !== JSON.stringify(localWords.sort()) ||
+              allDeletedWords.length !== localDeletedWords.length) {
+            
+            await chrome.storage.local.set({ 
+              words: mergedWords,
+              deletedWords: allDeletedWords 
+            });
+            
+            console.log('📱 Words synced from another device. New count:', mergedWords.length);
+            this.showSyncStatus('Đồng bộ từ thiết bị khác', 'info');
             
             // Trigger re-highlight
             if (window.highlightAll) {
