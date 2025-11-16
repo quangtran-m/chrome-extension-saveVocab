@@ -3,7 +3,7 @@ class FirebaseSync {
   constructor() {
     this.isAuthenticated = false;
     this.currentUser = null;
-    this.syncEnabled = true; // Will be loaded from storage
+    this.syncEnabled = false; // Default OFF - will be loaded from storage
     this.lastSyncTime = null;
     this.pollingInterval = null;
     this.firebaseREST = null;
@@ -12,8 +12,8 @@ class FirebaseSync {
 
   async init() {
     try {
-      // Load sync enabled setting  
-      const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+      // Load sync enabled setting (default OFF)
+      const { syncEnabled = false } = await chrome.storage.local.get("syncEnabled");
       this.syncEnabled = syncEnabled;
       console.log('🔄 Sync setting loaded:', this.syncEnabled);
       

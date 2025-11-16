@@ -134,7 +134,7 @@ dropdownMenu.style.cssText = `
 const menuItems = [
   { id: 'simpleLoginButton', text: '🔐 Đăng nhập Email', color: '#4CAF50', authState: 'logged-out' },
   { id: 'simpleLogoutButton', text: '👤 User', color: '#34A853', authState: 'logged-in' },
-  { id: 'autoSyncToggle', text: '🔄 Auto Sync: ON', color: '#00C851', toggle: true },
+  { id: 'autoSyncToggle', text: '⏸️ Auto Sync: OFF', color: '#FF6B6B', toggle: true },
   { id: 'uploadButton', text: '⬆️ Upload to Firebase', color: '#2196F3' },
   { id: 'downloadButton', text: '⬇️ Download from Firebase', color: '#2196F3' },
   { id: 'exportButton', text: '📄 Export file', color: '#FF9800' },
@@ -181,7 +181,7 @@ menuItems.forEach((item, index) => {
 async function updateAutoSyncButton() {
   const autoSyncToggle = document.getElementById('autoSyncToggle');
   if (autoSyncToggle) {
-    const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+    const { syncEnabled = false } = await chrome.storage.local.get("syncEnabled");
     autoSyncToggle.textContent = syncEnabled ? '🔄 Auto Sync: ON' : '⏸️ Auto Sync: OFF';
     autoSyncToggle.style.background = syncEnabled ? '#00C851' : '#FF6B6B';
   }
@@ -358,7 +358,7 @@ document.addEventListener("keydown", async (e) => {
           
           // Auto-sync to Firebase if enabled
           if (window.firebaseSync) {
-            const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+            const { syncEnabled = false } = await chrome.storage.local.get("syncEnabled");
             if (syncEnabled) {
               await window.firebaseSync.uploadToFirebase();
             }
@@ -392,7 +392,7 @@ document.addEventListener("keydown", async (e) => {
       
       // Auto-sync to Firebase if enabled
       if (window.firebaseSync) {
-        const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+        const { syncEnabled = false } = await chrome.storage.local.get("syncEnabled");
         if (syncEnabled) {
           await window.firebaseSync.uploadToFirebase();
         }
@@ -410,7 +410,7 @@ document.addEventListener("keydown", async (e) => {
       
       // Auto-sync to Firebase if enabled
       if (window.firebaseSync) {
-        const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+        const { syncEnabled = false } = await chrome.storage.local.get("syncEnabled");
         if (syncEnabled) {
           await window.firebaseSync.uploadToFirebase();
         }
@@ -432,7 +432,7 @@ document.addEventListener("keydown", async (e) => {
     
     // Auto-sync to Firebase if enabled
     if (window.firebaseSync) {
-      const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+      const { syncEnabled = false } = await chrome.storage.local.get("syncEnabled");
       if (syncEnabled) {
         await window.firebaseSync.uploadToFirebase();
       }
@@ -541,7 +541,7 @@ setTimeout(() => {
         
         // Auto-sync to Firebase if enabled
         if (window.firebaseSync) {
-          const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+          const { syncEnabled = false } = await chrome.storage.local.get("syncEnabled");
           if (syncEnabled) {
             await window.firebaseSync.uploadToFirebase();
           }
@@ -635,7 +635,7 @@ setTimeout(() => {
   const autoSyncToggle = document.getElementById('autoSyncToggle');
   if (autoSyncToggle) {
     autoSyncToggle.onclick = async () => {
-      const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+      const { syncEnabled = false } = await chrome.storage.local.get("syncEnabled");
       const newSyncEnabled = !syncEnabled;
       
       // Save new state and update Firebase sync
@@ -820,7 +820,7 @@ window.clearDeletedWords = async function() {
   console.log("🗑️ Deleted words list cleared");
   
   if (window.firebaseSync) {
-    const { syncEnabled = true } = await chrome.storage.local.get("syncEnabled");
+    const { syncEnabled = false } = await chrome.storage.local.get("syncEnabled");
     if (syncEnabled) {
       await window.firebaseSync.uploadToFirebase();
       console.log("📤 Changes uploaded to Firebase");
